@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Gerador de Script do Word</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    pre { white-space: pre-wrap; background: #f9f9f9; border: 1px solid #ccc; padding: 10px; }
+    button { margin-top: 10px; padding: 8px 15px; background: #2c7be5; border: none; color: #fff; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>Gerar Script a partir de um Word</h2>
+  <input type="file" id="fileInput" accept=".docx" />
+  <button id="downloadBtn" disabled>Baixar Script</button>
+  <h3>Script Gerado:</h3>
+  <pre id="output"></pre>
+
+  <script>
+    let scriptFinal = "";
+
+    document.getElementById("fileInput").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const arrayBuffer = await file.arrayBuffer();
+      const zip = await JSZip.loadAsync(arrayBuffer);
+
+      const docXml = await zip.file("word/document.xml").async("string");
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(docXml, "application/xml");
+
+      const paragraphs = xmlDoc.getElementsByTagNameNS("*", "p");
+      let textos = [];
+      let textoAtual = "";
+      let comecou = false;
+
+      for (let p of paragraphs) {
+        let runs = p.getElementsByTagNameNS("*", "r");
+        let textoParagrafo = "";
+
+        for (let run of runs) {
+          let textoNodes = run.getElementsByTagNameNS("*", "t");
+          if (!textoNodes.length) continue;
+
+          let texto = Array.from(textoNodes).map(t => t.textContent).join("");
+          let textoAux = texto;
+
+          // cor do texto
+          let corNode = run.getElementsByTagNameNS("*", "color")[0];
+          let cor = corNode ? corNode.getAttribute("w:val") || corNode.getAttribute("val") : null;
+
+          // ignora se for vermelho
+          if (cor === "FF0000") continue;
+
+          // começa a coleta ao encontrar seção
+          if (!comecou && /^(1\.|2\.|3\.)/.test(texto)) {
+            comecou = true;
+          }
+
+          if (comecou) {
+            // remove prefixo numérico tipo "1.1 "
+            textoAux = textoAux.replace(/^\d+(\.\d+)*\s*/, "");
+            textoParagrafo += textoAux + " ";
+          }
+        }
+
+        if (textoParagrafo.trim()) {
+          textoAtual += textoParagrafo.trim() + "\n";
+        }
+      }
+
+      if (textoAtual.trim()) {
+        textos = textoAtual.trim().split("\n");
+      }
+
+      // Gera script Selenium/JS
+      let script = "";
+      let isPergunta = true;
+      let valorQuestao = 0;
+
+      for (let i = 0; i < textos.length; i++) {
+        if (i === 58) break;
+
+        if (isPergunta) {
+          i--;
+          isPergunta = false;
+          continue;
+        }
+
+        let valorTbody = "tbody1";
+        if (i <= 23) {
+          valorTbody = "tbody1";
+        } else if (i < 40) {
+          if (i === 24) valorQuestao = 0;
+          valorTbody = "tbody2";
+        } else {
+          if (i === 40) valorQuestao = 0;
+          valorTbody = "tbody3";
+        }
+
+        let texto = textos[i].replace(/\r?\n|\r/g, " ");
+
+        script += `
+var tbody = document.getElementById('${valorTbody}');
+var tr${i} = tbody.querySelector('#Questao${valorQuestao}');
+var textarea${i} = tr${i}.querySelector('textarea');
+textarea${i}.value = \`${texto}\`;
+`;
+
+        isPergunta = true;
+        valorQuestao++;
+      }
+
+      scriptFinal = script;
+      document.getElementById("output").textContent = scriptFinal;
+      document.getElementById("downloadBtn").disabled = false;
+    });
+
+    document.getElementById("downloadBtn").addEventListener("click", () => {
+      const blob = new Blob([scriptFinal], { type: "text/javascript" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "script-gerado.js";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>
