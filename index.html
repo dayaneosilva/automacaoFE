@@ -4,16 +4,20 @@
   <meta charset="UTF-8">
   <title>Gerador de Script do Word</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     pre { white-space: pre-wrap; background: #f9f9f9; border: 1px solid #ccc; padding: 10px; }
-    button { margin-top: 10px; padding: 8px 15px; background: #2c7be5; border: none; color: #fff; cursor: pointer; }
+    button { margin-top: 10px; padding: 8px 15px; background: #2c7be5; border: none; color: #fff; cursor: pointer; border-radius: 5px; }
+    button:disabled { background: #aaa; cursor: not-allowed; }
   </style>
 </head>
 <body>
   <h2>Gerar Script a partir de um Word</h2>
   <input type="file" id="fileInput" accept=".docx" />
-  <button id="downloadBtn" disabled>Baixar Script</button>
+  <button id="copyBtn" disabled>Copiar Script</button>
+
   <h3>Script Gerado:</h3>
   <pre id="output"></pre>
 
@@ -115,17 +119,24 @@ textarea${i}.value = \`${texto}\`;
 
       scriptFinal = script;
       document.getElementById("output").textContent = scriptFinal;
-      document.getElementById("downloadBtn").disabled = false;
+      document.getElementById("copyBtn").disabled = false;
     });
 
-    document.getElementById("downloadBtn").addEventListener("click", () => {
-      const blob = new Blob([scriptFinal], { type: "text/javascript" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "script-gerado.js";
-      a.click();
-      URL.revokeObjectURL(url);
+    document.getElementById("copyBtn").addEventListener("click", async () => {
+      if (!scriptFinal) return;
+      try {
+        await navigator.clipboard.writeText(scriptFinal); 
+
+        Swal.fire({
+  position: "top-center",
+  icon: "success",
+  title: "Script copiado para a área de transferência!",
+  showConfirmButton: false,
+  timer: 1500
+});
+      } catch (err) {
+        alert("Erro ao copiar o script: " + err);
+      }
     });
   </script>
 </body>
