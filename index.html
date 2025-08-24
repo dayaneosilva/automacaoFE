@@ -4,22 +4,21 @@
   <meta charset="UTF-8">
   <title>Gerador de Script do Word</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    pre { white-space: pre-wrap; background: #f9f9f9; border: 1px solid #ccc; padding: 10px; }
-    button { margin-top: 10px; padding: 8px 15px; background: #2c7be5; border: none; color: #fff; cursor: pointer; border-radius: 5px; }
-    button:disabled { background: #aaa; cursor: not-allowed; }
-  </style>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <h2>Gerar Script a partir de um Word</h2>
-  <input type="file" id="fileInput" accept=".docx" />
-  <button id="copyBtn" disabled>Copiar Script</button>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-6">
+  <div class="bg-white rounded-lg shadow-lg p-8 w-full max-w-3xl">
+    <h2 class="text-2xl font-bold mb-4 text-center text-gray-800">Gerar Script a partir de um Word</h2>
+    
+    <input type="file" id="fileInput" accept=".docx" class="border p-2 w-full rounded mb-4" />
+    
+    <button id="copyBtn" disabled class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 w-full mb-4">Copiar Script</button>
 
-  <h3>Script Gerado:</h3>
-  <pre id="output"></pre>
+    <h3 class="text-xl font-semibold mb-2 text-gray-700">Script Gerado:</h3>
+    <pre id="output" class="bg-gray-100 p-4 rounded h-80 overflow-auto border text-gray-800"></pre>
+  </div>
+
 
   <script>
     let scriptFinal = "";
