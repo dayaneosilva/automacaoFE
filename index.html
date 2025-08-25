@@ -8,20 +8,25 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col items-center p-6">
-  <div class="bg-white rounded-lg shadow-lg p-8 w-full max-w-3xl">
-    <h2 class="text-2xl font-bold mb-4 text-center text-gray-800">Gerar Script a partir de um Word</h2>
+  <div class="bg-white rounded-lg shadow-lg p-8 w-full max-w-4xl">
+    <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">Gerar Script a partir de um Word</h2>
     
     <input type="file" id="fileInput" accept=".docx" class="border p-2 w-full rounded mb-4" />
     
-    <button id="copyBtn" disabled class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 w-full mb-4">Copiar Script</button>
+    <button id="copyBtn" disabled class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 w-full mb-6">Copiar Script</button>
 
     <h3 class="text-xl font-semibold mb-2 text-gray-700">Script Gerado:</h3>
-    <pre id="output" class="bg-gray-100 p-4 rounded h-80 overflow-auto border text-gray-800"></pre>
+    <pre id="output" class="bg-gray-50 p-4 rounded h-96 overflow-auto border text-gray-800"></pre>
   </div>
-
 
   <script>
     let scriptFinal = "";
+
+    // Função para remover títulos do tipo "1.1 Nome"
+    function removerTitulo(texto) {
+      const posEspaco = texto.indexOf(" ");
+      return posEspaco > 0 ? texto.substring(posEspaco).trim() : texto;
+    }
 
     document.getElementById("fileInput").addEventListener("change", async (e) => {
       const file = e.target.files[0];
@@ -35,14 +40,15 @@
       const xmlDoc = parser.parseFromString(docXml, "application/xml");
 
       const paragraphs = xmlDoc.getElementsByTagNameNS("*", "p");
+
       let textos = [];
       let textoAtual = "";
       let comecou = false;
+      let isTextoVermelho = true;
 
       for (let p of paragraphs) {
         let runs = p.getElementsByTagNameNS("*", "r");
-        let textoParagrafo = "";
-
+        
         for (let run of runs) {
           let textoNodes = run.getElementsByTagNameNS("*", "t");
           if (!textoNodes.length) continue;
@@ -50,49 +56,64 @@
           let texto = Array.from(textoNodes).map(t => t.textContent).join("");
           let textoAux = texto;
 
-          // cor do texto
+          if (/^(1\.|2\.|3\.)/.test(texto)) {
+            isTextoVermelho = true;
+          }
+
+          // se está marcado como vermelho, ignora
           let corNode = run.getElementsByTagNameNS("*", "color")[0];
-          let cor = corNode ? corNode.getAttribute("w:val") || corNode.getAttribute("val") : null;
+          let cor = corNode ? (corNode.getAttribute("w:val") || corNode.getAttribute("val")) : null;
+          if (cor === "FF0000") {
+            isTextoVermelho = false;
+            continue;
+          }
 
-          // ignora se for vermelho
-          if (cor === "FF0000") continue;
+          if (isTextoVermelho) {
+            texto = "";
+          }
 
-          // começa a coleta ao encontrar seção
-          if (!comecou && /^(1\.|2\.|3\.)/.test(texto)) {
+          if (!comecou && /^(1\.|2\.|3\.)/.test(textoAux)) {
             comecou = true;
           }
 
           if (comecou) {
-            // remove prefixo numérico tipo "1.1 "
-            textoAux = textoAux.replace(/^\d+(\.\d+)*\s*/, "");
-            textoParagrafo += textoAux + " ";
+            if (/^(1\.|2\.|3\.)/.test(textoAux)) {
+              texto = removerTitulo(texto);
+            }
+            textoAtual += texto + " ";
           }
         }
 
-        if (textoParagrafo.trim()) {
-          textoAtual += textoParagrafo.trim() + "\n";
+        if (/^(1\.|2\.|3\.)/.test(p.textContent) && textoAtual.trim()) {
+          textos.push(textoAtual.trim());
+          textoAtual = "";
+        }
+
+        if (textoAtual.trim() && !textoAtual.endsWith("\n")) {
+          textoAtual = textoAtual.trim() + "\n\n";
         }
       }
 
       if (textoAtual.trim()) {
-        textos = textoAtual.trim().split("\n");
+        textos.push(textoAtual.trim());
       }
 
-      // Gera script Selenium/JS
+      // ---------- Agora a parte do cálculo (igual ao C#) ----------
       let script = "";
-      let isPergunta = true;
+      let IsPergunta = true;
       let valorQuestao = 0;
 
       for (let i = 0; i < textos.length; i++) {
         if (i === 58) break;
 
-        if (isPergunta) {
+        if (IsPergunta) {
           i--;
-          isPergunta = false;
+          IsPergunta = false;
           continue;
         }
 
         let valorTbody = "tbody1";
+
         if (i <= 23) {
           valorTbody = "tbody1";
         } else if (i < 40) {
@@ -104,7 +125,6 @@
         }
 
         let texto = textos[i].replace(/\r?\n|\r/g, " ");
-
         script += `
 var tbody = document.getElementById('${valorTbody}');
 var tr${i} = tbody.querySelector('#Questao${valorQuestao}');
@@ -112,7 +132,7 @@ var textarea${i} = tr${i}.querySelector('textarea');
 textarea${i}.value = \`${texto}\`;
 `;
 
-        isPergunta = true;
+        IsPergunta = true;
         valorQuestao++;
       }
 
@@ -121,20 +141,22 @@ textarea${i}.value = \`${texto}\`;
       document.getElementById("copyBtn").disabled = false;
     });
 
+    // Botão de copiar
     document.getElementById("copyBtn").addEventListener("click", async () => {
       if (!scriptFinal) return;
       try {
-        await navigator.clipboard.writeText(scriptFinal); 
-
+        await navigator.clipboard.writeText(scriptFinal);
         Swal.fire({
-  position: "top-center",
-  icon: "success",
-  title: "Script copiado para a área de transferência!",
-  showConfirmButton: false,
-  timer: 1500
-});
+          icon: 'success',
+          title: 'Sucesso!',
+          text: 'Script copiado para a área de transferência!',
+        });
       } catch (err) {
-        alert("Erro ao copiar o script: " + err);
+        Swal.fire({
+          icon: 'error',
+          title: 'Erro',
+          text: 'Não foi possível copiar o script: ' + err,
+        });
       }
     });
   </script>
